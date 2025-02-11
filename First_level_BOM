@@ -1,0 +1,115 @@
+#include "Header.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+int ITK_user_main(int argc, char* argv[]) {
+    int i = 0, j = 0, k = 0, iRevCount = 0, iNumberOfChild = 0;
+    char* cObjName = NULL;
+    char* cItemId = NULL;
+    char* cRevisionId = NULL;
+    char* cAssembly_Level = NULL;
+    char* cParent_Assembly = NULL;
+    char* cOwner = NULL;
+    char* cGroup = NULL;
+
+    tag_t tItem = NULLTAG;
+    tag_t tWindow = NULLTAG;
+    tag_t tChild = NULLTAG;
+    tag_t tBomLine = NULLTAG;
+
+    tag_t* tRevList = NULL;
+    tag_t* tBomChild = NULL;
+
+    char* cItemID = ITK_ask_cli_argument("-item_id=");
+
+    file = TC_fopen("BOM_Report.csv", "w+");
+    if (file != NULL) {
+        // Write CSV header
+        fprintf(file, "Object_Name, ItemID, RevisionID, Assembly_Level, Parent_Assembly, Group\n");
+
+        if (cItemID != NULL) {
+            // Login to the infodba module (assuming reportError handles errors)
+            reportError(ITK_init_module("infodba", "infodba", "dba"));
+            printf("\n\nLogin success");
+
+            reportError(ITEM_find_item(cItemID, &tItem));
+            if (tItem != NULLTAG) {
+                printf("\n\nFind item success");
+
+                reportError(ITEM_list_all_revs(tItem, &iRevCount, &tRevList));
+                if (tRevList != NULL && iRevCount > 0) {
+                    printf("\n\nRevision found success");
+
+                    for (i = 0; i < iRevCount; i++) {
+                        reportError(BOM_create_window(&tWindow));
+                        reportError(BOM_set_window_top_line(tWindow, tItem, tRevList[i], NULLTAG, &tBomLine));
+
+                        // Query the BOM line properties
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_rev_object_name", &cObjName));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_item_item_id", &cItemID));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_rev_item_revision_id", &cRevisionId));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_level_starting_0", &cAssembly_Level));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_formatted_parent_name", &cParent_Assembly));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_rev_owning_user", &cOwner));
+                        reportError(AOM_UIF_ask_value(tBomLine, "bl_rev_owning_group", &cGroup));
+
+                        // Write BOM line details to CSV
+                        fprintf(file, "%s,%s,%s,%s,%s,%s\n", cObjName, cItemID, cRevisionId, cAssembly_Level, cParent_Assembly, cGroup);
+
+                        // Handle child lines if they exist
+                        reportError(BOM_line_ask_all_child_lines(tBomLine, &iNumberOfChild, &tBomChild));
+                        if (iNumberOfChild > 0) {
+                            for (j = 0; j < iNumberOfChild; j++) {
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_rev_object_name", &cObjName));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_item_item_id", &cItemID));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_rev_item_revision_id", &cRevisionId));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_level_starting_0", &cAssembly_Level));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_formatted_parent_name", &cParent_Assembly));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_rev_owning_user", &cOwner));
+                                reportError(AOM_UIF_ask_value(tBomChild[j], "bl_rev_owning_group", &cGroup));
+
+                                // Write child BOM line details to CSV
+                                fprintf(file, "%s,%s,%s,%s,%s,%s\n", cObjName, cItemID, cRevisionId, cAssembly_Level, cParent_Assembly, cGroup);
+                            }
+                        }
+                    }
+                }
+                else {
+                    printf("\n\nNo revisions found for the item.\n");
+                }
+
+                // Free memory after processing
+                if (tRevList) {
+                    MEM_free(tRevList);
+                }
+                if (tBomChild) {
+                    MEM_free(tBomChild);
+                }
+
+                // Close BOM window
+                reportError(BOM_close_window(tWindow));
+            }
+            else {
+                printf("\n\nItem not found.\n");
+            }
+        }
+        else {
+            printf("\n\nPlease provide an item_id.\n");
+            fclose(file);
+            exit(0);
+        }
+
+        // Close the file after writing
+        fflush(file);
+        fclose(file);
+    }
+    else {
+        printf("\n\nError opening the file for writing.\n");
+    }
+
+    // Logout from the module
+    reportError(ITK_exit_module(TRUE));
+    printf("\n\nLogout Success\n");
+
+    return 0;
+}
