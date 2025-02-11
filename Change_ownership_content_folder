@@ -1,0 +1,79 @@
+#include "Header.h"
+
+int ITK_user_main(int argc, char* argv[]) {
+    int iCount = 0;
+    int iNumRef = 0;
+    char* cFolderName = NULL;
+    char* cValue = NULL;
+    tag_t* tSearchList = NULLTAG;
+    tag_t* tListOfRef = NULLTAG;
+    tag_t tUser = NULLTAG;
+    tag_t tNewUser = NULLTAG;
+    tag_t tGroup = NULLTAG;
+
+    WSO_search_criteria_t tWSOCriteria;
+
+    /* char* cUserID = ITK_ask_cli_argument("-u=");
+     char* cPassword = ITK_ask_cli_argument("-p=");
+     char* cGroup = ITK_ask_cli_argument("-g=");*/
+     //char* cItemID = ITK_ask_cli_argument("-item_id=");
+
+     // Initialize module
+    reportError(ITK_init_module("infodba", "infodba", "dba"));
+    // reportError(ITK_init_module(cUserID, cPassword, cGroup));
+    printf("\n\n Login success");
+
+    // Find user
+    reportError(SA_find_user2("infodba", &tUser));
+    // reportError(SA_find_user2(cUserID, &tUser));
+    printf("\n\n Find user success");
+
+    // Clear search criteria before applying
+    reportError(WSOM_clear_search_criteria(&tWSOCriteria));
+    printf("\n\n clear search criteria");
+
+    // Set criteria for searching "Folder" objects of class "TATA"
+    tc_strcpy(tWSOCriteria.class_name, "Folder");  // Set the class name criteria
+    tc_strcpy(tWSOCriteria.name, "KiaMotor");  // Set the folder name criteria
+    tWSOCriteria.owner = tUser;
+
+    // Perform the search
+    reportError(WSOM_search(tWSOCriteria, &iCount, &tSearchList));
+    printf("\n\n Search success");
+
+    // Iterate over all search results (found folders)
+        for (int i = 0; i < iCount; i++) {
+
+            reportError(FL_ask_references(tSearchList[i], FL_fsc_by_name, &iNumRef, &tListOfRef));
+            reportError(SA_find_user2("AdminV", &tNewUser));
+            reportError(SA_find_group("Engineering", &tGroup));
+
+            if (iNumRef > 0)
+            {
+                printf("\n\n no of child parts : %d",iNumRef);
+
+                for (int j = 0; j < iNumRef; j++) {
+                    reportError(AOM_refresh(tListOfRef[j], TRUE));
+                    reportError(AOM_set_ownership(tListOfRef[j], tNewUser, tGroup));
+                    reportError(AOM_save_without_extensions(tListOfRef[j]));
+                    reportError(AOM_refresh(tListOfRef[j], FALSE));
+                }
+            }
+            else {
+                printf("\n\n Container is empty.");
+            }
+        }
+    
+
+    // Free memory allocated for the search results and objects
+    if (tSearchList && tListOfRef) {
+        MEM_free(tSearchList);
+        MEM_free(tListOfRef);
+    }
+ 
+    // Logout from the module
+    reportError(ITK_exit_module(TRUE));
+    printf("\n\n Logout Success");
+
+    return 0;
+}
