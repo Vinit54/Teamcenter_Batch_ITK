@@ -1,0 +1,60 @@
+#include "Header.h"
+
+int ITK_user_main(int argc, char* argv[]) {
+
+    int ifail = 0;
+    int row_count = 0;
+
+    tag_t tItemType = NULLTAG;
+    tag_t tItemCreateInput = NULLTAG;
+    tag_t tItem = NULLTAG;
+    tag_t tRev = NULLTAG;
+
+    input_t record;
+
+    char buf[1024];
+    const char delim[2] = ",";
+    char* Token = NULL;
+
+    char* cError = NULL;
+    FILE* fp = TC_fopen("C:\\Users\\AdminV\\source\\repos\\Vinit_ITK\\x64\\Debug\\Input.csv", "r");
+    if (!fp) {
+        printf("\n\nCan't open file\n");
+        exit(1);  // Exit with error code
+    }
+    else {
+        reportError(ITK_init_module("infodba", "infodba", "dba"));
+        printf("\n\nLogin success");
+
+        while (fgets(buf, sizeof(buf), fp)) {
+            row_count++;
+            if (row_count == 1) {
+                continue;  // Skip header row
+            }
+
+            // Tokenize the line
+            char* cItemID = strtok_s(buf, delim, &Token);
+            char* cItemName = strtok_s(NULL, delim, &Token);
+            char* cItemType = strtok_s(NULL, delim, &Token);
+
+            // Assign tokens to record
+            record.cItemID = cItemID;
+            record.cItemName = cItemName;
+            record.cItemType = cItemType;
+
+            // Find item
+            reportError(ITEM_find_item(record.cItemID, &tItem));
+            if (tItem == NULLTAG) {
+                reportError(ITEM_create_item(record.cItemID, record.cItemName, record.cItemType, "", &tItem, &tRev));
+                printf("\n\nItem create success");
+                reportError(ITEM_save_item(tItem));
+                printf("\n\nItem save success");
+            }
+            else {
+                printf("\n\nItem with ID %s already exists", record.cItemID);
+            }
+        }
+    }
+    fclose(fp);
+    return 0;
+}
